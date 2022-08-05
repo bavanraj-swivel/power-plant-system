@@ -2,14 +2,17 @@ package com.system.powerplant.service;
 
 import com.system.powerplant.domain.entity.Battery;
 import com.system.powerplant.domain.request.BatteryRequestDto;
+import com.system.powerplant.domain.response.BatteryListResponseDto;
+import com.system.powerplant.domain.response.BatterySummaryResponseDto;
 import com.system.powerplant.exception.PowerPlantApplicationException;
+import com.system.powerplant.exception.RequiredFieldsMissingException;
 import com.system.powerplant.repository.BatteryRepository;
 import org.springframework.dao.DataAccessException;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
+import java.util.DoubleSummaryStatistics;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Battery service.
@@ -30,12 +33,26 @@ public class BatteryService {
      */
     public void addBulkBatteries(List<BatteryRequestDto> batteryRequestDtoList) {
         try {
-            List<Battery> batteryList = new ArrayList<>();
-            batteryRequestDtoList.forEach(batteryRequestDto -> batteryList.add(new Battery(batteryRequestDto)));
+            List<Battery> batteryList = batteryRequestDtoList
+                    .stream()
+                    .map(this::validateRequiredFieldsForBatteries)
+                    .collect(Collectors.toList());
             batteryRepository.saveAll(batteryList);
         } catch (DataAccessException e) {
             throw new PowerPlantApplicationException("Failed to save battery detail list to database.", e);
         }
+    }
+
+    /**
+     * This method checks if required fields are available.
+     *
+     * @param batteryRequestDto batteryRequestDto
+     * @return battery/exception.
+     */
+    private Battery validateRequiredFieldsForBatteries(BatteryRequestDto batteryRequestDto) {
+        if (batteryRequestDto.isRequiredFieldsAvailable())
+            return new Battery(batteryRequestDto);
+        throw new RequiredFieldsMissingException("Required fields are missing.");
     }
 
     /**
@@ -45,10 +62,23 @@ public class BatteryService {
      * @param endValue   postcode end value
      * @return battery list.
      */
-    public List<Battery> getBatteriesInPostalCodeRange(int startValue, int endValue) {
+    public BatteryListResponseDto getBatteriesInPostalCodeRange(int startValue, int endValue) {
         try {
-            Sort sort = Sort.by(Sort.Direction.ASC, "name");
-            return batteryRepository.findByPostcodeIsBetween(startValue, endValue, sort);
+            List<Battery> batteryList = batteryRepository.findByPostcodeIsBetween(startValue, endValue);
+
+            List<String> batteryNames = batteryList
+                    .stream()
+                    .map(Battery::getName)
+                    .sorted()
+                    .collect(Collectors.toList());
+
+            DoubleSummaryStatistics doubleSummaryStatistics = batteryList
+                    .stream()
+                    .mapToDouble(Battery::getWatts)
+                    .summaryStatistics();
+
+            BatterySummaryResponseDto batterySummary = new BatterySummaryResponseDto(doubleSummaryStatistics);
+            return new BatteryListResponseDto(batterySummary, batteryNames);
         } catch (DataAccessException e) {
             throw new PowerPlantApplicationException("Failed to get batteries in postal code range.", e);
         }

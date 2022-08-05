@@ -8,9 +8,9 @@ import lombok.Getter;
 @Getter
 public enum ErrorMessage {
 
-    FAILED_TO_ADD("Failed to add battery details."),
-    FAILED_TO_GET("Failed to get battery details."),
-    INVALID_VALUES("Invalid postcode range.");
+    INTERNAL_SERVER_ERROR("Something went wrong."),
+    INVALID_VALUES("Invalid postcode range."),
+    MISSING_REQUIRED_FIELDS("Required fields are missing.");
 
     private final String message;
 

@@ -6,7 +6,7 @@ package com.system.powerplant.exception;
 public class PowerPlantApplicationException extends RuntimeException {
 
     /**
-     * Authentication Exception with error message and throwable error.
+     * Power plant application exception with error message and throwable error.
      *
      * @param errorMessage error message
      * @param error        error
@@ -16,7 +16,7 @@ public class PowerPlantApplicationException extends RuntimeException {
     }
 
     /**
-     * Authentication Exception with error message.
+     * Power plant application exception with error message.
      *
      * @param errorMessage error message
      */

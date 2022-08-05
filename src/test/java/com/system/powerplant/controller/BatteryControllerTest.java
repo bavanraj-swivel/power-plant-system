@@ -1,12 +1,13 @@
 package com.system.powerplant.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.system.powerplant.domain.entity.Battery;
-import com.system.powerplant.domain.request.AddBulkBatteriesRequestDto;
 import com.system.powerplant.domain.request.BatteryRequestDto;
+import com.system.powerplant.domain.response.BatteryListResponseDto;
 import com.system.powerplant.enumeration.ErrorMessage;
 import com.system.powerplant.enumeration.SuccessMessage;
 import com.system.powerplant.exception.PowerPlantApplicationException;
+import com.system.powerplant.exception.RequiredFieldsMissingException;
 import com.system.powerplant.service.BatteryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,7 +20,6 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
@@ -37,7 +37,6 @@ class BatteryControllerTest {
     private static final int START_VALUE = 0;
     private static final int END_VALUE = 10500;
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final AddBulkBatteriesRequestDto addBulkBatteriesRequestDto = getAddBulkBatteriesRequestDto();
     private MockMvc mockMvc;
     @Mock
     private BatteryService batteryService;
@@ -54,10 +53,9 @@ class BatteryControllerTest {
      */
 
     @Test
-    void Should_ReturnSuccessMessage_When_AddingBatteryDetailsIsSuccessful() throws Exception {
-        String objectToJson = objectMapper.writeValueAsString(addBulkBatteriesRequestDto);
+    void Should_ReturnOk_When_AddingBatteryDetailsIsSuccessful() throws Exception {
         mockMvc.perform(MockMvcRequestBuilders.post(ADD_BATTERY_URI)
-                        .content(objectToJson)
+                        .content(getBatteryRequestDtoList())
                         .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value(SuccessMessage.SUCCESSFULLY_ADDED.getMessage()))
@@ -65,16 +63,26 @@ class BatteryControllerTest {
     }
 
     @Test
-    void Should_ReturnErrorMessage_When_AddingBatteryDetailsIsFailedDueToException() throws Exception {
+    void Should_ReturnBadRequest_When_AddingBatteryDetailsIsFailedDueToMissingFields() throws Exception {
+        doThrow(new RequiredFieldsMissingException("Required fields are missing."))
+                .when(batteryService).addBulkBatteries(anyList());
+        mockMvc.perform(MockMvcRequestBuilders.post(ADD_BATTERY_URI)
+                        .content(getBatteryRequestDtoList())
+                        .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value(ErrorMessage.MISSING_REQUIRED_FIELDS.getMessage()))
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
+    void Should_ReturnInternalServerError_When_AddingBatteryDetailsIsFailedDueToInternalErrors() throws Exception {
         doThrow(new PowerPlantApplicationException("Failed to save battery detail list to database."))
                 .when(batteryService).addBulkBatteries(anyList());
-
-        String objectToJson = objectMapper.writeValueAsString(addBulkBatteriesRequestDto);
         mockMvc.perform(MockMvcRequestBuilders.post(ADD_BATTERY_URI)
-                        .content(objectToJson)
+                        .content(getBatteryRequestDtoList())
                         .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value(ErrorMessage.FAILED_TO_ADD.getMessage()))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.message").value(ErrorMessage.INTERNAL_SERVER_ERROR.getMessage()))
                 .andExpect(jsonPath("$.data").isEmpty());
     }
 
@@ -83,54 +91,48 @@ class BatteryControllerTest {
      */
 
     @Test
-    void Should_ReturnSuccessMessage_When_GettingBatteryDetailsInPostcodeRangeIsSuccessful() throws Exception {
+    void Should_ReturnOk_When_GettingBatteryDetailsInPostcodeRangeIsSuccessful() throws Exception {
         String uri = GET_BATTERY_URI
                 .replace("{startValue}", String.valueOf(START_VALUE))
                 .replace("{endValue}", String.valueOf(END_VALUE));
-        List<Battery> batteryList = new ArrayList<>();
-        batteryList.add(new Battery());
-        when(batteryService.getBatteriesInPostalCodeRange(START_VALUE, END_VALUE)).thenReturn(batteryList);
-
+        when(batteryService.getBatteriesInPostalCodeRange(START_VALUE, END_VALUE))
+                .thenReturn(new BatteryListResponseDto());
         mockMvc.perform(MockMvcRequestBuilders.get(uri)
                         .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value(SuccessMessage.SUCCESSFULLY_RETURNED.getMessage()))
-                .andExpect(jsonPath("$.data.totalBatteries").value(1));
+                .andExpect(jsonPath("$.message").value(SuccessMessage.SUCCESSFULLY_RETURNED.getMessage()));
     }
 
     @Test
-    void Should_ReturnErrorMessage_When_GettingBatteryDetailsInInvalidPostcodeRange() throws Exception {
+    void Should_ReturnBadRequest_When_GettingBatteryDetailsInInvalidPostcodeRange() throws Exception {
         String uri = GET_BATTERY_URI
                 .replace("{startValue}", String.valueOf(END_VALUE))
                 .replace("{endValue}", String.valueOf(START_VALUE));
-
         mockMvc.perform(MockMvcRequestBuilders.get(uri)
                         .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
+                .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value(ErrorMessage.INVALID_VALUES.getMessage()))
                 .andExpect(jsonPath("$.data").isEmpty());
     }
 
     @Test
-    void Should_ReturnErrorMessage_When_GettingBatteryDetailsInPostcodeRangeFailedDueToExceptions() throws Exception {
+    void Should_ReturnInternalServerError_When_GettingBatteryDetailsIsFailedDueToInternalErrors() throws Exception {
         String uri = GET_BATTERY_URI
                 .replace("{startValue}", String.valueOf(START_VALUE))
                 .replace("{endValue}", String.valueOf(END_VALUE));
         doThrow(new PowerPlantApplicationException("Failed to get batteries in postal code range."))
                 .when(batteryService).getBatteriesInPostalCodeRange(START_VALUE, END_VALUE);
-
         mockMvc.perform(MockMvcRequestBuilders.get(uri)
                         .contentType(MediaType.APPLICATION_JSON).accept(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value(ErrorMessage.FAILED_TO_GET.getMessage()))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.message").value(ErrorMessage.INTERNAL_SERVER_ERROR.getMessage()))
                 .andExpect(jsonPath("$.data").isEmpty());
     }
 
-    private AddBulkBatteriesRequestDto getAddBulkBatteriesRequestDto() {
-        AddBulkBatteriesRequestDto addBulkBatteriesRequestDto = new AddBulkBatteriesRequestDto();
+    private String getBatteryRequestDtoList() throws JsonProcessingException {
         List<BatteryRequestDto> batteryList = new ArrayList<>();
-        batteryList.add(new BatteryRequestDto());
-        addBulkBatteriesRequestDto.setBatteryList(batteryList);
-        return addBulkBatteriesRequestDto;
+        batteryList.add(new BatteryRequestDto("CEB", 10400, 500.0));
+        batteryList.add(new BatteryRequestDto("LECO", 10800, 300.0));
+        return objectMapper.writeValueAsString(batteryList);
     }
 }
