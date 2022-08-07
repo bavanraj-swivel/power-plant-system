@@ -48,11 +48,13 @@ class BatteryServiceTest {
 
     @Test
     void Should_ThrowRequiredFieldsMissingException_When_RequiredFieldIsMissing() {
-        List<BatteryRequestDto> batteryList = List.of(new BatteryRequestDto("", 10400, 500.0));
+        BatteryRequestDto batteryRequestDto = new BatteryRequestDto("", 10400, 500.0);
+        List<BatteryRequestDto> batteryList = List.of(batteryRequestDto);
         RequiredFieldsMissingException exception = assertThrows(RequiredFieldsMissingException.class, () -> {
             batteryService.addBulkBatteries(batteryList);
         });
-        assertEquals("Required fields are missing.", exception.getMessage());
+        assertEquals("Required fields are missing for battery request: " + batteryRequestDto.toLogJson(),
+                exception.getMessage());
     }
 
     @Test

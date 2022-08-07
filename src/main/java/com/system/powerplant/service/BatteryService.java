@@ -50,9 +50,11 @@ public class BatteryService {
      * @return battery/exception.
      */
     private Battery validateRequiredFieldsForBatteries(BatteryRequestDto batteryRequestDto) {
-        if (batteryRequestDto.isRequiredFieldsAvailable())
-            return new Battery(batteryRequestDto);
-        throw new RequiredFieldsMissingException("Required fields are missing.");
+        if (!batteryRequestDto.isRequiredFieldsAvailable()) {
+            throw new RequiredFieldsMissingException("Required fields are missing for battery request: " +
+                    batteryRequestDto.toLogJson());
+        }
+        return new Battery(batteryRequestDto);
     }
 
     /**

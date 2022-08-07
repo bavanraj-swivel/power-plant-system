@@ -64,7 +64,7 @@ public class BatteryController extends BaseController {
                 return getBadRequestErrorResponse(ErrorMessage.INVALID_VALUES);
             BatteryListResponseDto batteryListResponseDto =
                     batteryService.getBatteriesInPostalCodeRange(startValue, endValue);
-            log.debug("Successfully returned battery details.");
+            log.debug("Successfully returned battery details. Battery info: " + batteryListResponseDto.toLogJson());
             return getSuccessResponse(SuccessMessage.SUCCESSFULLY_RETURNED, batteryListResponseDto);
         } catch (PowerPlantApplicationException e) {
             log.error("Failed to get battery details.", e);
